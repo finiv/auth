@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\UserResource;
-use App\Services\OpenWeatherService;
+use App\Services\OpenWeather\OpenWeatherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,7 +19,7 @@ class OpenWeatherController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $data = $this->service->getAndCacheWeatherData($request->user()->id);
+        $data = $this->service->getAndCacheWeatherData();
 
         return response()->json(['user' => UserResource::make($request->user()), 'main' => $data]);
     }

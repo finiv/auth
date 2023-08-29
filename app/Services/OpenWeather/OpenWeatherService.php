@@ -1,14 +1,19 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\OpenWeather;
 
 use App\Repositories\WeatherRepository;
+use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Stevebauman\Location\Facades\Location;
+use Stevebauman\Location\Position;
 use Symfony\Component\HttpFoundation\Response;
 
 class OpenWeatherService
 {
+    const OPER_WEATHER_PREFIX = 'weather_';
+
     /**
      * Create a new OpenWeatherService instance.
      *
@@ -23,15 +28,19 @@ class OpenWeatherService
     /**
      * Fetch and cache weather data.
      *
-     * @param string $cacheKey
      * @return array
+     * @throws Exception|GuzzleException
      */
-    public function getAndCacheWeatherData(string $cacheKey): array
+    public function getAndCacheWeatherData(): array
     {
+        $location = $this->getLocation();
+
+        $cacheKey = self::OPER_WEATHER_PREFIX . $location->countryCode . '_' . $location->regionCode;
+
         $cachedData = $this->weatherRepository->getWeatherData($cacheKey);
 
         if ($cachedData) {
-            if (now() < $cachedData['expires_at']){
+            if (now() < $cachedData['expires_at']) {
                 return $cachedData['data'];
             }
 
@@ -48,6 +57,7 @@ class OpenWeatherService
      * Get weather data from the OpenWeather API.
      *
      * @return array
+     * @throws Exception|GuzzleException
      */
     private function getWeatherData(): array
     {
@@ -58,7 +68,7 @@ class OpenWeatherService
      * Send a GET request to the OpenWeather API.
      *
      * @return array
-     * @throws \Exception
+     * @throws Exception|GuzzleException
      */
     public function send(): array
     {
@@ -78,13 +88,23 @@ class OpenWeatherService
     }
 
     /**
+     * Get user Location
+     *
+     * @return bool|Position
+     */
+    private function getLocation()
+    {
+        return Location::get();
+    }
+
+    /**
      * Get the parameters for the OpenWeather API request.
      *
      * @return string
      */
     private function getParameters(): string
     {
-        $location = Location::get();
+        $location = $this->getLocation();
 
         return "?lat=$location->latitude&lon=$location->longitude&exclude=hourly,minutely,alerts&appid=" . $this->getApiKey();
     }
@@ -104,7 +124,7 @@ class OpenWeatherService
      *
      * @param $response
      * @return array
-     * @throws \Exception
+     * @throws Exception
      */
     private function getResponseBody($response): array
     {
@@ -113,7 +133,7 @@ class OpenWeatherService
             return @json_decode($body, true);
         }
 
-        throw new \Exception(
+        throw new Exception(
             'OpenWeather bad response code '
             . $response->getStatusCode(),
             Response::HTTP_BAD_REQUEST

@@ -1,3 +1,10 @@
+Installation
+ - ./vendor/bin/sail up -d
+ - ./vendor/bin/sail composer install
+ - ./vendor/bin/sail artisan migrate
+
+Home page http://localhost:8081/api/home
+
 Laravel Benchmarking Test
 Client Account Self Registration
 

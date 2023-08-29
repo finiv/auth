@@ -6,14 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\EmailRegistrationRequest;
 use App\Http\Requests\LoginRequest;
 use App\Models\User;
+use App\Services\Auth\EmailService;
+use App\Services\Auth\GoogleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly GoogleService $googleService,
+        private readonly EmailService $emailService,
+    ) {}
+
     /**
      * Redirect the user to the Google authentication page.
      *
@@ -21,7 +28,7 @@ class AuthController extends Controller
      */
     public function redirectToProvider(): RedirectResponse
     {
-        return Socialite::driver('google')->redirect();
+        return $this->googleService->redirectToProvider();
     }
 
     /**
@@ -31,18 +38,7 @@ class AuthController extends Controller
      */
     public function handleProviderCallback(): JsonResponse
     {
-        $googleUser = Socialite::driver('google')->user();
-        $email = $googleUser->getEmail();
-        $user = User::where('email', $email)->first();
-
-        if (!$user) {
-            $user = User::create([
-                'name' => $googleUser->getName(),
-                'email' => $googleUser->getEmail(),
-            ]);
-        }
-
-        $token = $user->createToken('access_token')->plainTextToken;
+        $token = $this->googleService->handleProviderCallback();
 
         return response()->json(['token' => $token]);
     }
@@ -55,13 +51,11 @@ class AuthController extends Controller
      */
     public function registerViaEmail(EmailRegistrationRequest $request): JsonResponse
     {
-        $user = User::create([
-            'name' => $request->input('name'),
-            'email' => $request->input('email'),
-            'password' => Hash::make($request->input('password')),
-        ]);
-
-        $token = $user->createToken('access_token')->plainTextToken;
+        $token = $this->emailService->register(
+            $request->input('name'),
+            $request->input('email'),
+            Hash::make($request->input('password'))
+        );
 
         return response()->json(['token' => $token]);
     }
@@ -72,12 +66,10 @@ class AuthController extends Controller
      * @param LoginRequest $request
      * @return JsonResponse
      */
-    public function loginViaEmail(LoginRequest $request): JsonResponse
+    public function loginViaEmail(Request $request): JsonResponse
     {
         if (Auth::attempt($request->only('email', 'password'))) {
-            $user = Auth::user();
-            $token = $user->createToken('auth_token')->plainTextToken;
-
+            $token = $this->emailService->createToken(Auth::user());
             return response()->json(['token' => $token], 200);
         }
 
